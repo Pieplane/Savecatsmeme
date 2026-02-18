@@ -28,7 +28,7 @@ export class LineDrawer {
   }
 
   /** подключить инпут */
-  hookInput(onLineFinalized: () => void) {
+  hookInput(onLineFinalized: () => void, onStartDraw?: () => void) {
     this.scene.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
       this.drawing = true;
       this.points = [];
@@ -36,6 +36,7 @@ export class LineDrawer {
 
       this.points.push({ x: p.worldX, y: p.worldY });
       this.redraw();
+      onStartDraw?.();
     });
 
     this.scene.input.on("pointermove", (p: Phaser.Input.Pointer) => {

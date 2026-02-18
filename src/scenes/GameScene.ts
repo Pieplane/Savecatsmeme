@@ -3,6 +3,7 @@ import { addTgDebugText } from "../services/tg";
 import { LineDrawer } from "../game/LineDrawer";
 import { CatRunner } from "../game/CatRunner";
 import { HudUI } from "../game/HudUI";
+import { tgHaptic } from "../services/tgHaptics";
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -43,9 +44,10 @@ export class GameScene extends Phaser.Scene {
 
     this.hud.setInkMax(260);
 
-    this.line.hookInput(() => {
-      this.cat.start();
-    });
+    this.line.hookInput(
+  () => this.cat.start(),
+  () => tgHaptic("light") // onStartDraw
+);
 
     // win
     this.matter.world.on("collisionstart", (ev: any) => {
@@ -71,10 +73,12 @@ export class GameScene extends Phaser.Scene {
   private onWin() {
     this.add.text(16, 70, "WIN 😺💞", { fontSize: "26px", color: "#000" });
     this.time.delayedCall(700, () => this.scene.restart());
+    tgHaptic("success");
   }
 
   private onLose() {
     this.add.text(16, 70, "LOSE 😿", { fontSize: "26px", color: "#000" });
     this.time.delayedCall(700, () => this.scene.restart());
+    tgHaptic("error");
   }
 }
