@@ -41,8 +41,12 @@ export class CatRunner {
   }
 
   stop() {
-    this.running = false;
-  }
+  const Body = (Phaser.Physics.Matter as any).Matter.Body;
+
+  Body.setVelocity(this.catBody, { x: 0, y: 0 });
+  Body.setAngularVelocity(this.catBody, 0);
+  Body.setStatic(this.catBody, true); // полностью замораживаем
+}
 
   update() {
     const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
@@ -66,4 +70,5 @@ export class CatRunner {
     const pos = (this.catBody as any).position;
     return pos && pos.y > y;
   }
+  
 }
