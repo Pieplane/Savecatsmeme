@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { MenuScene } from "./scenes/MenuScene";
 import { GameScene } from "./scenes/GameScene";
 
 function initTelegram() {
@@ -6,8 +7,8 @@ function initTelegram() {
   if (!tg) return;
 
   tg.ready();
-  // tg.expand(); // можно включить позже в Telegram
-  // tg.disableVerticalSwipes?.(); // если доступно
+  // tg.expand();
+  // tg.disableVerticalSwipes?.();
 }
 
 initTelegram();
@@ -26,8 +27,8 @@ new Phaser.Game({
     default: "matter",
     matter: {
       gravity: { x: 0, y: 1.2 },
-      debug: true, // включишь true когда надо
+      debug: true,
     },
   },
-  scene: [GameScene],
+  scene: [MenuScene, GameScene], // ← сначала меню
 });

@@ -5,6 +5,9 @@ import { CatRunner } from "../game/CatRunner";
 import { HudUI } from "../game/HudUI";
 import { tgHaptic } from "../services/tgHaptics";
 import { UIManager } from "../game/UIManager";
+import { loadProgress, saveProgress } from "../services/progress";
+import { DailyTasks } from "../game/DailyTasks";
+import { Lives } from "../game/Lives";
 
 
 export class GameScene extends Phaser.Scene {
@@ -14,6 +17,10 @@ export class GameScene extends Phaser.Scene {
   private ui!: UIManager;
   private ended = false;
   private paused = false;
+  private levelId = 1;
+private inkMax = 260;
+private daily = new DailyTasks();
+private lives = new Lives();
   
 
   constructor() {
@@ -21,7 +28,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    if (!this.lives.consumeOne()) {
+  // нет жизней → назад в меню
+  this.scene.start("MenuScene");
+  return;
+}
+
   this.ended = false;
+
+  this.daily.inc("play_5", 1);
   this.cameras.main.setBackgroundColor("#5abcd4");
   this.input.setTopOnly(true);
 
@@ -45,9 +60,9 @@ export class GameScene extends Phaser.Scene {
   this.cat = new CatRunner(this, w, h);
 
   // линия
-  this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: 260 });
-  this.line.setInkMax(260);
-  this.hud.setInkMax(260);
+  this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: this.inkMax });
+  this.line.setInkMax(this.inkMax);
+  this.hud.setInkMax(this.inkMax);
   this.line.setEnabled(true);
 
   this.line.hookInput(
@@ -98,11 +113,31 @@ export class GameScene extends Phaser.Scene {
   if (this.ended) return;
   this.ended = true;
 
-  this.cat.stop();          // если ты добавил stop()
+  this.cat.stop();
   this.line.setEnabled(false);
 
-  this.ui.showWin(() => this.scene.restart());
+  // ⭐ stars
+  this.daily.inc("win_3", 1);
+  const used = this.inkMax - this.line.inkLeft;
+  if (used <= 150) this.daily.inc("ink_150", 1);
+  const ratio = used / this.inkMax;
+  const stars = ratio <= 0.4 ? 3 : ratio <= 0.7 ? 2 : 1;
+
+  const p = loadProgress();
+  const prev = p.bestStarsByLevel[this.levelId] ?? 0;
+  if (stars > prev) p.bestStarsByLevel[this.levelId] = stars;
+
+  // награда монетами (пример)
+  const reward = stars === 3 ? 20 : stars === 2 ? 12 : 6;
+  p.coins += reward;
+  saveProgress(p);
+
+  
+  this.ui.showWin(() => this.scene.restart()); // лучше модалкой
+  this.ui.setWinInfo({ stars, reward });       // добавим чуть позже в UIManager
   tgHaptic("success");
+
+  //this.time.delayedCall(700, () => this.scene.restart());
 }
 
 private endLose() {

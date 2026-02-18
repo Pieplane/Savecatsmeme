@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { DailyTasks } from "./DailyTasks";
 
 type Task = { id: string; title: string; progress: number; goal: number };
 type UIHooks = {
@@ -24,12 +25,19 @@ export class UIManager {
   private resultModal: Phaser.GameObjects.Container;
   private resultTitle: Phaser.GameObjects.Text;
   private hooks?: UIHooks;
+  private winInfoText?: Phaser.GameObjects.Text;
+  private headerText?: Phaser.GameObjects.Text;
+
+  private toastText?: Phaser.GameObjects.Text;
+private toastBg?: Phaser.GameObjects.Rectangle;
+private toastTimer?: Phaser.Time.TimerEvent;
 
   private tasks: Task[] = [
     { id: "t1", title: "Выиграй 1 раз", progress: 0, goal: 1 },
     { id: "t2", title: "Потрать ≤ 200 ink", progress: 0, goal: 200 },
     { id: "t3", title: "Не упади 1 раз", progress: 0, goal: 1 },
   ];
+  private daily = new DailyTasks();
 
   constructor(scene: Phaser.Scene, hooks?: UIHooks) {
     this.scene = scene;
@@ -48,7 +56,7 @@ export class UIManager {
     this.root.add(this.modalDim);
 
     // HUD
-    this.inkText = scene.add.text(16, 14, "Ink: 0", {
+    this.inkText = scene.add.text(16, 34, "Ink: 0", {
       fontSize: "18px",
       color: "#000",
       fontFamily: "Arial",
@@ -117,15 +125,21 @@ export class UIManager {
 
   private openTasks() {
     this.hooks?.onModalOpen?.(); // ✅ выключаем рисование
+    const state = this.daily.getState();
     this.modalDim.setVisible(true);
     this.tasksModal.setVisible(true);
     this.resultModal.setVisible(false);
 
-    this.tasksListText.setText(this.tasks.map(t => {
-      const p = Math.min(t.progress, t.goal);
-      return `• ${t.title}\n  ${p}/${t.goal}`;
-    }).join("\n\n"));
-  }
+    this.tasksListText.setText(
+    state.map(t => {
+      const status = t.claimed ? "✅" : (t.progress >= t.goal ? "🎁" : "");
+      return `${status} ${t.title}\n${t.progress}/${t.goal}   +${t.reward}💰`;
+    }).join("\n\n")
+  );
+this.modalDim.setVisible(true);
+  this.tasksModal.setVisible(true);
+  this.resultModal.setVisible(false);
+}
 
   private openResult(onOk?: () => void) {
     this.modalDim.setVisible(true);
@@ -213,4 +227,92 @@ export class UIManager {
     c.add([bg, t]);
     return c;
   }
+  public setWinInfo(data: { stars: number; reward: number }) {
+  if (!this.resultModal) return;
+
+  // если ещё не создан текст — создаём
+  if (!this.winInfoText) {
+    this.winInfoText = this.scene.add.text(0, 30, "", {
+      fontSize: "20px",
+      color: "#000",
+      fontFamily: "Arial",
+    }).setOrigin(0.5);
+
+    this.resultModal.add(this.winInfoText);
+  }
+
+  this.winInfoText.setText(`⭐ ${data.stars}   +${data.reward} 💰`);
+}
+public openTasksPublic() {
+  this.openTasks();
+}
+public setHeader(data: { coins: number; lives: string; regenAt: number }) {
+  if (!this.headerText) {
+    this.headerText = this.scene.add.text(16, 16, "", { fontSize: "18px", color: "#000", fontFamily: "Arial" });
+    this.root.add(this.headerText);
+  }
+
+  let regen = "";
+  if (data.regenAt && data.regenAt > Date.now()) {
+    const s = Math.max(0, Math.floor((data.regenAt - Date.now()) / 1000));
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    regen = `  +1 через ${mm}:${ss}`;
+  }
+
+  this.headerText.setText(`💰 ${data.coins}   ❤️ ${data.lives}${regen}`);
+}
+public showToast(message: string, duration = 2000) {
+  const w = this.scene.scale.width;
+  const h = this.scene.scale.height;
+
+  if (!this.toastBg) {
+    this.toastBg = this.scene.add.rectangle(
+      w / 2,
+      h - 80,
+      w - 60,
+      44,
+      0x000000,
+      0.8
+    ).setOrigin(0.5);
+
+    this.toastText = this.scene.add.text(
+      w / 2,
+      h - 80,
+      "",
+      {
+        fontSize: "16px",
+        color: "#ffffff",
+        fontFamily: "Arial",
+        align: "center",
+      }
+    ).setOrigin(0.5);
+
+    this.root.add(this.toastBg);
+    this.root.add(this.toastText);
+  }
+
+  this.toastText!.setText(message);
+
+  this.toastBg.setAlpha(0);
+  this.toastText!.setAlpha(0);
+
+  this.scene.tweens.add({
+    targets: [this.toastBg, this.toastText],
+    alpha: 1,
+    duration: 150,
+  });
+
+  if (this.toastTimer) {
+    this.toastTimer.remove(false);
+  }
+
+  this.toastTimer = this.scene.time.delayedCall(duration, () => {
+    this.scene.tweens.add({
+      targets: [this.toastBg, this.toastText],
+      alpha: 0,
+      duration: 200,
+    });
+  });
+}
 }
