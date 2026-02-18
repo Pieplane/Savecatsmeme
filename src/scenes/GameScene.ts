@@ -4,6 +4,7 @@ import { LineDrawer } from "../game/LineDrawer";
 import { CatRunner } from "../game/CatRunner";
 import { HudUI } from "../game/HudUI";
 import { tgHaptic } from "../services/tgHaptics";
+import { getThemeColors, onThemeChanged } from "../services/tgTheme";
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -15,7 +16,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.cameras.main.setBackgroundColor("#5abcd4");
+    const apply = () => {
+  const t = getThemeColors();
+  this.cameras.main.setBackgroundColor(t.bg);
+
+  // если хочешь, чтобы текст всегда читался:
+  titleText.setColor(t.text);
+  // и debug текст тоже (если выводишь)
+    };
+    const titleText = this.add
+  .text(16, 16, "Нарисуй мост. Отпусти палец — кот пойдет.", { fontSize: "18px", color: "#000" })
+  .setScrollFactor(0);
+
+    apply();
+
+    // если пользователь поменял тему во время игры
+    const off = onThemeChanged(() => apply());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => off());
 
     const w = this.scale.width;
     const h = this.scale.height;
@@ -28,8 +45,6 @@ export class GameScene extends Phaser.Scene {
     // TG debug
     addTgDebugText(this);
 
-    // UI
-    this.add.text(16, 16, "Нарисуй мост. Отпусти палец — кот пойдет.", { fontSize: "18px", color: "#000" }).setScrollFactor(0);
 
     // системы
     this.hud = new HudUI(this);
