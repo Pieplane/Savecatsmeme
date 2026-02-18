@@ -4,7 +4,7 @@ import { LineDrawer } from "../game/LineDrawer";
 import { CatRunner } from "../game/CatRunner";
 import { HudUI } from "../game/HudUI";
 import { tgHaptic } from "../services/tgHaptics";
-import { getThemeColors, onThemeChanged } from "../services/tgTheme";
+
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -16,23 +16,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const apply = () => {
-  const t = getThemeColors();
-  this.cameras.main.setBackgroundColor(t.bg);
-
-  // если хочешь, чтобы текст всегда читался:
-  titleText.setColor(t.text);
-  // и debug текст тоже (если выводишь)
-    };
-    const titleText = this.add
-  .text(16, 16, "Нарисуй мост. Отпусти палец — кот пойдет.", { fontSize: "18px", color: "#000" })
-  .setScrollFactor(0);
-
-    apply();
-
-    // если пользователь поменял тему во время игры
-    const off = onThemeChanged(() => apply());
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => off());
+    this.cameras.main.setBackgroundColor("#5abcd4");
 
     const w = this.scale.width;
     const h = this.scale.height;
@@ -45,17 +29,18 @@ export class GameScene extends Phaser.Scene {
     // TG debug
     addTgDebugText(this);
 
+    // UI
+    this.add.text(16, 16, "Нарисуй мост. Отпусти палец — кот пойдет.", { fontSize: "18px", color: "#000" }).setScrollFactor(0);
 
     // системы
     this.hud = new HudUI(this);
 
     this.cat = new CatRunner(this, w, h);
 
-    this.line = new LineDrawer(this, {
-      thickness: 14,
-      minPointDist: 10,
-      inkMax: 260,
-    });
+    this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: 400 });
+
+
+    this.line.setEnabled(true);
 
     this.hud.setInkMax(260);
 
@@ -79,6 +64,7 @@ export class GameScene extends Phaser.Scene {
   update() {
     this.cat.update();
     this.hud.drawInk(this.line.inkLeft);
+    this.line.update();
 
     if (this.cat.isFallenBelow(this.scale.height + 200)) {
       this.onLose();
@@ -87,12 +73,14 @@ export class GameScene extends Phaser.Scene {
 
   private onWin() {
     this.add.text(16, 70, "WIN 😺💞", { fontSize: "26px", color: "#000" });
+    this.line.setEnabled(false);
     this.time.delayedCall(700, () => this.scene.restart());
     tgHaptic("success");
   }
 
   private onLose() {
     this.add.text(16, 70, "LOSE 😿", { fontSize: "26px", color: "#000" });
+    this.line.setEnabled(false);
     this.time.delayedCall(700, () => this.scene.restart());
     tgHaptic("error");
   }
