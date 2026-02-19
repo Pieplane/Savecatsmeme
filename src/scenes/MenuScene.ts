@@ -20,6 +20,7 @@ export class MenuScene extends Phaser.Scene {
 
     // UI поверх меню
     this.ui = new UIManager(this);
+    this.ui.setGameHudVisible(false); // ← скрыли игровые кнопки и Ink
 
     // Заголовок
     this.add.text(this.scale.width / 2, 60, "SAVE CATS MEME", {

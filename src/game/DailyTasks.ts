@@ -10,11 +10,11 @@ export type TaskDef = {
 export const DAILY_TASKS: TaskDef[] = [
   { id: "win_3", title: "Выиграй 3 раза", goal: 3, reward: 30 },
   { id: "play_5", title: "Сыграй 5 раз", goal: 5, reward: 20 },
-  { id: "ink_150", title: "Победа с расходом ≤ 150 ink", goal: 1, reward: 25 },
+  { id: "ink_150", title: "Победа с расходом линии ≤ 150", goal: 1, reward: 25 },
 
   { id: "fast_win_20", title: "Выиграй за ≤ 20 секунд", goal: 1, reward: 35 },
  { id: "no_fail_2", title: "Сделай 2 победы без поражений", goal: 1, reward: 40 },
-  { id: "ink_120", title: "Победа с расходом ≤ 120 ink", goal: 1, reward: 45 },
+  { id: "ink_120", title: "Победа с расходом линии ≤ 120", goal: 1, reward: 45 },
   { id: "streak_2", title: "Сделай серию 2 побед подряд", goal: 1, reward: 50 },
 ];
 
@@ -82,5 +82,17 @@ tryClaimAllBonus(): boolean {
   p.daily.allBonusClaimed = true;
   saveProgress(p);
   return true;
+}
+tryClaimAllAvailable(): { coinsGained: number } {
+  const before = loadProgress().coins;
+
+  const state = this.getState();
+  for (const t of state) {
+    if (!t.claimed && t.progress >= t.goal) this.tryClaim(t.id);
+  }
+  this.tryClaimAllBonus();
+
+  const after = loadProgress().coins;
+  return { coinsGained: after - before };
 }
 }

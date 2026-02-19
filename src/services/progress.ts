@@ -16,6 +16,10 @@ export type ProgressData = {
     wins: number;
     noFail: number;
   };
+  referral: {            // ⬅ ДОБАВИТЬ ВОТ ЭТО
+    invitedCount: number;
+    claimedInvite1: boolean;
+  };
 };
 
 const KEY = "CATBRIDGE_PROGRESS_V1";
@@ -67,6 +71,10 @@ export function loadProgress(): ProgressData {
     daily: makeFreshDaily(tk),
     lives: { count: 5, nextRegenAt: 0 },
     streak: { wins: 0, noFail: 0 },
+    referral: {              // ⬅ ДОБАВИТЬ
+    invitedCount: 0,
+    claimedInvite1: false,
+  },
   };
 
   const raw = localStorage.getItem(KEY);
@@ -108,6 +116,16 @@ export function loadProgress(): ProgressData {
     if (!parsed.daily.tasks) parsed.daily.tasks = {};
     if (!parsed.daily.claimed) parsed.daily.claimed = {};
 
+    if (!parsed.referral) {
+  parsed.referral = { invitedCount: 0, claimedInvite1: false };
+} else {
+  if (typeof parsed.referral.invitedCount !== "number")
+    parsed.referral.invitedCount = 0;
+
+  if (typeof parsed.referral.claimedInvite1 !== "boolean")
+    parsed.referral.claimedInvite1 = false;
+}
+
     // merge
     return {
       ...base,
@@ -123,6 +141,10 @@ export function loadProgress(): ProgressData {
       streak: {
         ...base.streak,
         ...(parsed.streak as any),
+      },
+      referral: {                     // ⬅ ВОТ ЭТО
+    ...base.referral,
+    ...(parsed.referral as any),
       },
       bestStarsByLevel: parsed.bestStarsByLevel as Record<number, number>,
       coins: parsed.coins as number,

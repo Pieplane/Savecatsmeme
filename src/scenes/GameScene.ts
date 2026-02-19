@@ -27,7 +27,6 @@ export class GameScene extends Phaser.Scene {
   private runStartedAt = 0;
   private catStarted = false; // чтобы не включать рисование после старта кота
 
-  private topStatsText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("GameScene");
@@ -57,19 +56,18 @@ export class GameScene extends Phaser.Scene {
     this.matter.add.rectangle(w * 0.78, h - 140, w * 0.35, 20, { isStatic: true });
 
     addTgDebugText(this);
-    this.topStatsText = this.add.text(16, 16, "", {
-  fontSize: "18px",
-  color: "#000",
-  fontFamily: "Arial",
-}).setScrollFactor(0);
-
-this.refreshTopStats();
+    // UI
+    this.ui = new UIManager(this, {
+  onModalOpen: () => this.pauseGame(),
+  onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
+});
+    this.refreshHeader();
 
 // чтобы жизни “тикали” когда идёт восстановление
 this.time.addEvent({
   delay: 1000,
   loop: true,
-  callback: () => this.refreshTopStats(),
+  callback: () => this.refreshHeader(),
 });
 
     this.add
@@ -101,11 +99,7 @@ this.time.addEvent({
       () => tgHaptic("light")
     );
 
-    // UI
-    this.ui = new UIManager(this, {
-      onModalOpen: () => this.pauseGame(),
-      onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
-    });
+    
 
     // WIN
     this.matter.world.on("collisionstart", (ev: any) => {
@@ -141,52 +135,57 @@ this.time.addEvent({
 }
 
   private endWin() {
-    if (this.ended) return;
-    this.ended = true;
+  if (this.ended) return;
+  this.ended = true;
 
-    this.cat.stop();
-    this.line.setEnabled(false);
+  this.cat.stop();
+  this.line.setEnabled(false);
 
-    // --- DAILY: win_3
-    this.daily.inc("win_3", 1);
+  const used = this.inkMax - this.line.inkLeft;
+  const dt = Date.now() - this.runStartedAt;
 
-    // --- DAILY: fast_win_20
-    const dt = Date.now() - this.runStartedAt;
-    if (dt <= 20_000) this.daily.inc("fast_win_20", 1);
+  // ✅ грузим прогресс ОДИН раз
+  const p = loadProgress();
 
-    // --- DAILY: ink thresholds
-    const used = this.inkMax - this.line.inkLeft;
-    if (used <= 150) this.daily.inc("ink_150", 1);
-    if (used <= 120) this.daily.inc("ink_120", 1);
+  // --- DAILY (пишем прямо в p) ---
+  p.daily.tasks["win_3"] = (p.daily.tasks["win_3"] ?? 0) + 1;
 
-    // --- STREAK (храним в progress, чтобы не сбрасывалось при restart)
-    const pProg = loadProgress();
-    const prevWins = pProg.streak.wins;
-    pProg.streak.wins = prevWins + 1;
-    pProg.streak.noFail = pProg.streak.noFail + 1; // в твоей игре win = noFail, lose сбрасывает
+  if (dt <= 20_000)
+    p.daily.tasks["fast_win_20"] = (p.daily.tasks["fast_win_20"] ?? 0) + 1;
 
-    // засчитываем “сделай серию 2” ровно в момент достижения 2
-    if (pProg.streak.wins === 2) this.daily.inc("streak_2", 1);
-    if (pProg.streak.noFail === 2) this.daily.inc("no_fail_2", 1);
+  if (used <= 150)
+    p.daily.tasks["ink_150"] = (p.daily.tasks["ink_150"] ?? 0) + 1;
 
-    // --- STARS + coins reward (за победу уровня)
-    const ratio = used / this.inkMax;
-    const stars = ratio <= 0.4 ? 3 : ratio <= 0.7 ? 2 : 1;
+  if (used <= 120)
+    p.daily.tasks["ink_120"] = (p.daily.tasks["ink_120"] ?? 0) + 1;
 
-    const prevStars = pProg.bestStarsByLevel[this.levelId] ?? 0;
-    if (stars > prevStars) pProg.bestStarsByLevel[this.levelId] = stars;
+  // --- STREAK ---
+  p.streak.wins = (p.streak.wins ?? 0) + 1;
+  p.streak.noFail = (p.streak.noFail ?? 0) + 1;
 
-    const reward = stars === 3 ? 20 : stars === 2 ? 12 : 6;
-    pProg.coins += reward;
+  // ✅ важный момент:
+  // если ты сделал goal=1 (выполнено/не выполнено) — то ставь 1
+  if (p.streak.wins >= 2) p.daily.tasks["streak_2"] = 1;
+  if (p.streak.noFail >= 2) p.daily.tasks["no_fail_2"] = 1;
 
-    saveProgress(pProg);
-    this.refreshTopStats();
+  // --- награда за победу ---
+  const ratio = used / this.inkMax;
+  const stars = ratio <= 0.4 ? 3 : ratio <= 0.7 ? 2 : 1;
 
-    // UI
-    this.ui.setWinInfo({ stars, reward });
-    this.ui.showWin(() => this.scene.restart());
-    tgHaptic("success");
-  }
+  const prevStars = p.bestStarsByLevel[this.levelId] ?? 0;
+  if (stars > prevStars) p.bestStarsByLevel[this.levelId] = stars;
+
+  const reward = stars === 3 ? 20 : stars === 2 ? 12 : 6;
+  p.coins += reward;
+
+  // ✅ сохраняем ОДИН раз
+  saveProgress(p);
+
+  // UI
+  this.ui.setWinInfo({ stars, reward });
+  this.ui.showWin(() => this.scene.restart());
+  tgHaptic("success");
+}
 
   private endLose() {
     if (this.ended) return;
@@ -202,7 +201,6 @@ this.time.addEvent({
 
     // ✅ тратим жизнь ТОЛЬКО тут
   const ok = this.lives.consumeOne();
-  this.refreshTopStats();
 
     if (!ok) {
     // жизней нет -> в меню
@@ -230,18 +228,13 @@ this.time.addEvent({
     // рисование разрешаем только если кот ещё НЕ стартовал
     if (!this.catStarted) this.line.setEnabled(true);
   }
-  private refreshTopStats() {
+  private refreshHeader() {
   const p = loadProgress();
   const st = this.lives.getState();
-
-  let regen = "";
-  if (st.count < st.max && st.nextRegenAt && st.nextRegenAt > Date.now()) {
-    const s = Math.ceil((st.nextRegenAt - Date.now()) / 1000);
-    const mm = String(Math.floor(s / 60)).padStart(2, "0");
-    const ss = String(s % 60).padStart(2, "0");
-    regen = `  +1 через ${mm}:${ss}`;
-  }
-
-  this.topStatsText.setText(`💰 ${p.coins}   ❤️ ${st.count}/${st.max}${regen}`);
+  this.ui.setHeader({
+    coins: p.coins,
+    lives: `${st.count}/${st.max}`,
+    regenAt: st.nextRegenAt,
+  });
 }
 }
