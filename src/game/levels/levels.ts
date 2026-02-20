@@ -13,6 +13,14 @@ export const LEVELS: Record<number, LevelConfig> = {
     ],
     goal: { x: 0.78, y: 0.60 },
     start: { x: 0.15, y: 0.60 },
+    hazard: {
+    delayMs: 2000,
+    spawnX: 0.5,
+    spawnY: -50,
+    repeat: true,
+    everyMs: 1500,
+    radius: 18,
+  },
   },
 
   2: {

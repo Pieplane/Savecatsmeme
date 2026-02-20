@@ -6,6 +6,11 @@ type Task = { id: string; title: string; progress: number; goal: number };
 type UIHooks = {
   onModalOpen?: () => void;
   onModalClose?: () => void;
+
+  // ✅ DEBUG
+  onDebugPrevLevel?: () => void;
+  onDebugNextLevel?: () => void;
+  onDebugRestartLevel?: () => void;
 };
 
 export class UIManager {
@@ -15,7 +20,7 @@ export class UIManager {
   // HUD
   private inkText: Phaser.GameObjects.Text;
   private btnTasks: Phaser.GameObjects.Container;
-  private btnRestart: Phaser.GameObjects.Container;
+  //private btnRestart: Phaser.GameObjects.Container;
 
   // Modals
   private modalDim: Phaser.GameObjects.Rectangle;
@@ -34,6 +39,10 @@ export class UIManager {
   private toastText?: Phaser.GameObjects.Text;
 private toastBg?: Phaser.GameObjects.Rectangle;
 private toastTimer?: Phaser.Time.TimerEvent;
+
+private debugBar?: Phaser.GameObjects.Container;
+private debugLevelText?: Phaser.GameObjects.Text;
+private debugEnabled = true; // выключишь на релизе
 
   private tasks: Task[] = [
     { id: "t1", title: "Выиграй 1 раз", progress: 0, goal: 1 },
@@ -71,8 +80,8 @@ const h = scene.scale.height;
     this.btnTasks = this.makeButton(w - 16 - 120, 10, 120, 36, "Задания", () => this.openTasks());
     this.root.add(this.btnTasks);
 
-    this.btnRestart = this.makeButton(w - 16 - 120, 10 + 44, 120, 36, "Рестарт", () => scene.scene.restart());
-    this.root.add(this.btnRestart);
+    //this.btnRestart = this.makeButton(w - 16 - 120, 10 + 44, 120, 36, "Рестарт", () => scene.scene.restart());
+    //this.root.add(this.btnRestart);
 
     this.tasksListContainer = scene.add.container(0, 0);
 
@@ -184,8 +193,8 @@ this.resultModal.add(btnNext);
     // reposition HUD buttons
     this.btnTasks.x = w - 16 - 120;
     this.btnTasks.y = 10;
-    this.btnRestart.x = w - 16 - 120;
-    this.btnRestart.y = 10 + 44;
+    //this.btnRestart.x = w - 16 - 120;
+    //this.btnRestart.y = 10 + 44;
 
     // center modals
     this.tasksModal.x = w * 0.5;
@@ -372,7 +381,7 @@ public showToast(message: string, duration = 2000) {
 public setGameHudVisible(v: boolean) {
   this.inkText.setVisible(v);
   this.btnTasks.setVisible(v);
-  this.btnRestart.setVisible(v);
+  //this.btnRestart.setVisible(v);
 }
 private renderTasksList() {
   this.tasksListContainer.removeAll(true);
@@ -497,5 +506,71 @@ private addSectionTitle(text: string, y: number, modalW: number) {
 
   this.tasksListContainer.add(t);
   return t;
+}
+public setDebugBarVisible(v: boolean) {
+  this.debugEnabled = v;
+  this.debugBar?.setVisible(v);
+}
+
+public setDebugLevel(levelId: number) {
+  this.debugLevelText?.setText(`LVL ${levelId}`);
+}
+
+public createDebugBar(initialLevelId: number) {
+  if (!this.debugEnabled) return;
+
+  // если пересоздаём
+  this.debugBar?.destroy(true);
+
+  const w = this.scene.scale.width;
+
+  const barY = 120;
+  const btnW = 54;
+  const btnH = 36;
+  const gap = 8;
+
+  const x0 = 16;
+
+  const btnPrev = this.makeButton(x0, barY, btnW, btnH, "◀", () => {
+    this.hooks?.onDebugPrevLevel?.();
+  });
+
+  const btnNext = this.makeButton(x0 + (btnW + gap) * 1, barY, btnW, btnH, "▶", () => {
+    this.hooks?.onDebugNextLevel?.();
+  });
+
+  const btnR = this.makeButton(x0 + (btnW + gap) * 2, barY, btnW, btnH, "↻", () => {
+    this.hooks?.onDebugRestartLevel?.();
+  });
+
+  // бейдж уровня
+  const badgeW = 90;
+  const badgeH = btnH;
+
+  const badge = this.scene.add.container(x0 + (btnW + gap) * 3 + 10, barY);
+
+  const badgeBg = this.scene.add.rectangle(0, 0, badgeW, badgeH, 0xffffff, 1)
+    .setOrigin(0, 0)
+    .setStrokeStyle(2, 0x000000, 0.2);
+
+  this.debugLevelText = this.scene.add.text(badgeW / 2, badgeH / 2, `LVL ${initialLevelId}`, {
+    fontSize: "16px",
+    color: "#000",
+    fontFamily: "Arial",
+  }).setOrigin(0.5, 0.5);
+
+  badge.add([badgeBg, this.debugLevelText]);
+
+  // соберём в один контейнер, чтобы удобно скрывать/двигать
+  this.debugBar = this.scene.add.container(0, 0, [btnPrev, btnNext, btnR, badge])
+    .setDepth(2000)
+    .setScrollFactor(0);
+
+  this.root.add(this.debugBar);
+
+  // адаптация под resize
+  this.scene.scale.on("resize", () => {
+    // если хочешь — можно сдвигать вправо, но сейчас слева, ок
+  });
 }
 }

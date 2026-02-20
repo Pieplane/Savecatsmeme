@@ -10,10 +10,21 @@ export class CatRunner {
   public goalGO: Phaser.GameObjects.Sprite;
 
   private running = false;
-  private targetSpeedX = 2.2;
+  private targetSpeedX = 2.8;
 
   private visualOffsetY = 64; // подбери число
-  private goalOffsetY = 10;
+  // смещение для обычной цели
+private goalIdleOffsetX = -25;
+private goalIdleOffsetY = 10;
+
+// смещение для победной анимации
+private goalWinOffsetX = 0;   // можно 15 если хочешь правее
+private goalWinOffsetY = 0;
+
+// текущее активное смещение
+private currentGoalOffsetX = -25;
+private currentGoalOffsetY = 10;
+  private finishing = false;
 
   constructor(scene: Phaser.Scene, w: number, h: number) {
     this.scene = scene;
@@ -28,7 +39,7 @@ export class CatRunner {
     // не спать
     matter.body.set(this.catBody, { sleepThreshold: -1 });
 
-    this.goalBody = matter.add.rectangle(w * 0.88, h - 180, 60, 60, {
+    this.goalBody = matter.add.rectangle(w * 0.88, h - 180, 150, 100, {
       isStatic: true,
       isSensor: true,
     });
@@ -58,6 +69,10 @@ this.goalGO.setDisplaySize(200, 200);
 
 // запускаем анимацию
 this.goalGO.anims.play("goal-loop", true);
+this.currentGoalOffsetX = this.goalIdleOffsetX;
+this.currentGoalOffsetY = this.goalIdleOffsetY;
+
+this.syncGoalVisualNow();
   }
 
   start() {
@@ -84,7 +99,7 @@ this.goalGO.anims.play("goal-loop", true);
   Body.setVelocity(this.catBody, { x: 0, y: 0 });
   Body.setAngularVelocity(this.catBody, 0);
   Body.setStatic(this.catBody, true);
-  this.catGO.anims.stop();
+  //this.catGO.anims.stop();
   this.goalGO.anims.stop();
 }
 
@@ -104,7 +119,11 @@ this.goalGO.anims.play("goal-loop", true);
     this.catGO.setRotation(0);
 
     const gp = (this.goalBody as any).position;
-    this.goalGO.setPosition(gp.x, gp.y - this.goalOffsetY);
+    //this.goalGO.setPosition(gp.x, gp.y - this.goalOffsetY);
+    this.goalGO.setPosition(
+  gp.x + this.currentGoalOffsetX,
+  gp.y - this.currentGoalOffsetY
+);
   }
 
   isFallenBelow(y: number) {
@@ -128,6 +147,31 @@ setCatPos(x: number, y: number) {
 
   // чтобы визуал сразу обновился (не ждать update)
   this.catGO.setPosition(x, y);
+}
+beginWinSequence(delayMs: number, onDone: () => void) {
+  if (this.finishing) return;
+  this.finishing = true;
+
+  this.stop();
+
+  // переключаем смещение
+  this.currentGoalOffsetX = this.goalWinOffsetX;
+  this.currentGoalOffsetY = this.goalWinOffsetY;
+
+  // ✅ применяем позицию сразу, даже если update больше не будет вызываться
+  this.syncGoalVisualNow();
+
+  this.goalGO.setDisplaySize(160, 160);
+  this.goalGO.anims.play("goal-win", true);
+
+  this.scene.time.delayedCall(delayMs, () => onDone());
+}
+private syncGoalVisualNow() {
+  const gp = (this.goalBody as any).position;
+  this.goalGO.setPosition(
+    gp.x + this.currentGoalOffsetX,
+    gp.y - this.currentGoalOffsetY
+  );
 }
   
 }

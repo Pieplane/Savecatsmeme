@@ -10,6 +10,7 @@ import { DailyTasks } from "../game/DailyTasks";
 import { Lives } from "../game/Lives";
 import { getLevel } from "../game/levels/levels";
 import type { PlatformRect } from "../game/levels/LevelConfig";
+import { HazardSystem } from "../game/HazardSystem";
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -29,6 +30,48 @@ export class GameScene extends Phaser.Scene {
   private runStartedAt = 0;
   private catStarted = false; // чтобы не включать рисование после старта кота
 
+  private winDelayMs = 1800;
+
+  private winQueued = false;
+  private winShown = false; // вместо _winShown
+  private matterWorld?: Phaser.Physics.Matter.World;
+
+  private hazards!: HazardSystem;
+
+  private onCollide = (ev: any) => {
+  if (this.ended) return;
+
+  for (const pair of ev.pairs) {
+    const a = pair.bodyA;
+    const b = pair.bodyB;
+
+    // ✅ 1) LOSE: кот + hazard
+    const aIsHazard = this.hazards?.isHazardBody(a);
+    const bIsHazard = this.hazards?.isHazardBody(b);
+
+    const isCatHazard =
+      (a === this.cat.catBody && bIsHazard) ||
+      (b === this.cat.catBody && aIsHazard);
+
+    if (isCatHazard && !this.winQueued) {
+      this.endLose();
+      return;
+    }
+
+    // ✅ 2) WIN: кот + цель (после hazard)
+    const isCatGoal =
+      (a === this.cat.catBody && b === this.cat.goalBody) ||
+      (b === this.cat.catBody && a === this.cat.goalBody);
+
+    if (isCatGoal && !this.winQueued) {
+      this.winQueued = true;
+      this.line.setEnabled(false);
+      this.cat.beginWinSequence(this.winDelayMs, () => this.endWin());
+      return;
+    }
+  }
+};
+
 
   constructor() {
     super("GameScene");
@@ -41,6 +84,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   this.runStartedAt = Date.now();
+  this.winQueued = false;
+  this.winShown = false;
   this.ended = false;
   this.paused = false;
   this.catStarted = false;
@@ -52,9 +97,20 @@ export class GameScene extends Phaser.Scene {
 
   const lvl = getLevel(this.levelId);
 
+  this.hazards = new HazardSystem(this, {
+  enabled: !!lvl.hazard,                 // или lvl.hazard?.enabled
+  delayMs: lvl.hazard?.delayMs ?? 2000,
+  spawnX: lvl.hazard?.spawnX ?? 0.5,
+  spawnY: lvl.hazard?.spawnY ?? -50,
+  repeat: lvl.hazard?.repeat ?? false,
+  everyMs: lvl.hazard?.everyMs ?? 1500,
+  radius: lvl.hazard?.radius ?? 18,
+  killBelowY: this.scale.height + 250,
+});
+
   this.inkMax = lvl.inkMax;
   // фон картинкой (если задан)
-if (lvl.visuals.backgroundKey) {
+  if (lvl.visuals.backgroundKey) {
   const bg = this.add.image(
     w / 2,
     h / 2,
@@ -74,9 +130,23 @@ if (lvl.visuals.backgroundKey) {
 
   // UI
   this.ui = new UIManager(this, {
-    onModalOpen: () => this.pauseGame(),
-    onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
-  });
+  onModalOpen: () => this.pauseGame(),
+  onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
+
+  onDebugPrevLevel: () => {
+    this.levelId = Math.max(1, this.levelId - 1);
+    this.scene.restart();
+  },
+  onDebugNextLevel: () => {
+    this.levelId += 1;
+    this.scene.restart();
+  },
+  onDebugRestartLevel: () => {
+    this.scene.restart();
+  },
+});
+this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬНО
+
   this.refreshHeader();
   this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshHeader() });
 
@@ -110,28 +180,31 @@ if (lvl.visuals.backgroundKey) {
       this.catStarted = true;
       this.line.setEnabled(false);
       this.cat.start();
+      this.hazards.start();
     },
     () => tgHaptic("light")
   );
 
   // WIN
-  this.matter.world.on("collisionstart", (ev: any) => {
-    if (this.ended) return;
+   this.matterWorld = this.matter?.world;
 
-    for (const pair of ev.pairs) {
-      const a = pair.bodyA;
-      const b = pair.bodyB;
+  const cleanup = () => {
+    this.hazards?.destroy();
 
-      if (
-        (a === this.cat.catBody && b === this.cat.goalBody) ||
-        (b === this.cat.catBody && a === this.cat.goalBody)
-      ) {
-        this.endWin();
-        return;
-      }
+    if (this.matterWorld) {
+      this.matterWorld.off("collisionstart", this.onCollide);
+      this.matterWorld = undefined;
     }
-  });
+  };
+
+  if (this.matterWorld) {
+    this.matterWorld.on("collisionstart", this.onCollide);
+  }
+
+  this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
+  this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
 }
+
 
   update() {
   if (this.paused || this.ended) return;
@@ -140,6 +213,7 @@ if (lvl.visuals.backgroundKey) {
   this.hud.drawInk(this.line.inkLeft);
   this.line.update();
   this.ui.setInk(this.line.inkLeft);
+  this.hazards.update();
 
   // ✅ проигрыш проверяем только после старта
   if (this.catStarted && this.cat.isFallenBelow(this.scale.height + 200)) {
@@ -148,11 +222,11 @@ if (lvl.visuals.backgroundKey) {
 }
 
   private endWin() {
-  if (this.ended) return;
-  this.ended = true;
+  if (this.winShown) return;
+  this.winShown = true;
 
-  this.cat.stop();
-  this.line.setEnabled(false);
+  if (this.ended) return; // на всякий
+  this.ended = true;
 
   const used = this.inkMax - this.line.inkLeft;
   const dt = Date.now() - this.runStartedAt;

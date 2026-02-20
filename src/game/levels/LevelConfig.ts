@@ -26,4 +26,13 @@ export type LevelConfig = {
   // если цель/финиш тоже по конфигу
   goal: { x: number; y: number };
   start: { x: number; y: number };
+
+  hazard?: {
+  delayMs: number;
+  spawnX: number;  // 0..1
+  spawnY: number;  // px (например -50)
+  repeat?: boolean;
+  everyMs?: number;
+  radius?: number;
+};
 };
