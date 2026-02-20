@@ -14,8 +14,19 @@ export class MenuScene extends Phaser.Scene {
     super("MenuScene");
   }
 
+  preload() {
+    this.load.image("bg_menu", "assets/bg_menu.png");
+  }
+
   create() {
-    this.cameras.main.setBackgroundColor("#5abcd4");
+    //this.cameras.main.setBackgroundColor("#5abcd4");
+    const w = this.scale.width;
+    const h = this.scale.height;
+
+    const bg = this.add.image(w / 2, h / 2, "bg_menu");
+    const scale = Math.max(w / bg.width, h / bg.height);
+    bg.setScale(scale);
+    bg.setDepth(-1000);
     this.input.setTopOnly(true);
 
     // UI поверх меню

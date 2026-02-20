@@ -1,0 +1,29 @@
+export type PlatformRect = {
+  x: number; y: number; w: number; h: number;
+  angle?: number;
+
+  visual?: {
+    key: string;           // ключ картинки
+    mode?: "stretch" | "tile" | "nineslice";
+    tileScale?: number;    // для tile
+    depth?: number;
+  };
+};
+
+export type LevelConfig = {
+  id: number;
+
+  inkMax: number;
+
+  visuals: {
+    backgroundColor?: string;
+    backgroundKey?: string;
+    hintText?: string;
+  };
+
+  platforms: PlatformRect[];
+
+  // если цель/финиш тоже по конфигу
+  goal: { x: number; y: number };
+  start: { x: number; y: number };
+};

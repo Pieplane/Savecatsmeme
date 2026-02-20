@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { BootScene } from "./game/BootScene";
 import { MenuScene } from "./scenes/MenuScene";
 import { GameScene } from "./scenes/GameScene";
 
@@ -27,8 +28,8 @@ new Phaser.Game({
     default: "matter",
     matter: {
       gravity: { x: 0, y: 1.2 },
-      debug: true,
+      debug: false,
     },
   },
-  scene: [MenuScene, GameScene], // ← сначала меню
+  scene: [BootScene, MenuScene, GameScene], // ← сначала меню
 });

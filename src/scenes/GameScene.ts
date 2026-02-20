@@ -8,6 +8,8 @@ import { UIManager } from "../game/UIManager";
 import { loadProgress, saveProgress } from "../services/progress";
 import { DailyTasks } from "../game/DailyTasks";
 import { Lives } from "../game/Lives";
+import { getLevel } from "../game/levels/levels";
+import type { PlatformRect } from "../game/levels/LevelConfig";
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -33,92 +35,103 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    if (!this.lives.canPlay()) {
+  if (!this.lives.canPlay()) {
     this.scene.start("MenuScene");
     return;
   }
 
-    this.runStartedAt = Date.now();
-    this.ended = false;
-    this.paused = false;
-    this.catStarted = false;
+  this.runStartedAt = Date.now();
+  this.ended = false;
+  this.paused = false;
+  this.catStarted = false;
 
+  this.input.setTopOnly(true);
 
-    this.cameras.main.setBackgroundColor("#5abcd4");
-    this.input.setTopOnly(true);
+  const w = this.scale.width;
+  const h = this.scale.height;
 
-    const w = this.scale.width;
-    const h = this.scale.height;
+  const lvl = getLevel(this.levelId);
 
-    // мир
-    this.matter.add.rectangle(w / 2, h - 40, w, 80, { isStatic: true });
-    this.matter.add.rectangle(w * 0.22, h - 80, w * 0.35, 20, { isStatic: true });
-    this.matter.add.rectangle(w * 0.78, h - 140, w * 0.35, 20, { isStatic: true });
+  this.inkMax = lvl.inkMax;
+  // фон картинкой (если задан)
+if (lvl.visuals.backgroundKey) {
+  const bg = this.add.image(
+    w / 2,
+    h / 2,
+    lvl.visuals.backgroundKey
+  );
 
-    addTgDebugText(this);
-    // UI
-    this.ui = new UIManager(this, {
-  onModalOpen: () => this.pauseGame(),
-  onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
-});
-    this.refreshHeader();
+  bg.setDisplaySize(w, h);
+  bg.setDepth(-100); // всегда позади всего
+} else {
+  // fallback на цвет
+  this.cameras.main.setBackgroundColor(lvl.visuals.backgroundColor ?? "#000");
+}
 
-// чтобы жизни “тикали” когда идёт восстановление
-this.time.addEvent({
-  delay: 1000,
-  loop: true,
-  callback: () => this.refreshHeader(),
-});
+  //this.cameras.main.setBackgroundColor(lvl.visuals.backgroundColor);
 
-    this.add
-      .text(16, 66, "Нарисуй мост. Отпусти палец — кот пойдет.", {
-        fontSize: "18px",
-        color: "#000",
-      })
-      .setScrollFactor(0);
+  addTgDebugText(this);
 
-    // системы
-    this.hud = new HudUI(this);
-    this.cat = new CatRunner(this, w, h);
+  // UI
+  this.ui = new UIManager(this, {
+    onModalOpen: () => this.pauseGame(),
+    onModalClose: () => this.time.delayedCall(0, () => this.resumeGame()),
+  });
+  this.refreshHeader();
+  this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshHeader() });
 
-    // линия
-    this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: this.inkMax });
-    this.line.setInkMax(this.inkMax);
-    this.hud.setInkMax(this.inkMax);
-    this.line.setEnabled(true);
-
-    this.line.hookInput(
-      () => {
-        // ✅ попытка засчитывается только когда игрок реально отпустил линию и запустил кота
-    this.daily.inc("play_5", 1);
-        // старт кота = дальше рисование запрещаем
-        this.catStarted = true;
-        this.line.setEnabled(false);
-        this.cat.start();
-      },
-      () => tgHaptic("light")
-    );
-
-    
-
-    // WIN
-    this.matter.world.on("collisionstart", (ev: any) => {
-      if (this.ended) return;
-
-      for (const pair of ev.pairs) {
-        const a = pair.bodyA;
-        const b = pair.bodyB;
-
-        if (
-          (a === this.cat.catBody && b === this.cat.goalBody) ||
-          (b === this.cat.catBody && a === this.cat.goalBody)
-        ) {
-          this.endWin();
-          return;
-        }
-      }
-    });
+  // hint
+  if (lvl.visuals.hintText) {
+    this.add.text(16, 66, lvl.visuals.hintText, { fontSize: "18px", color: "#000" }).setScrollFactor(0);
   }
+
+  // платформы (ТОЛЬКО из конфига)
+  for (const p of lvl.platforms) {
+  this.spawnPlatform(p);
+}
+
+  // системы
+  this.hud = new HudUI(this);
+
+  // кот (ОДИН раз)
+  this.cat = new CatRunner(this, w, h);  
+  this.cat.setGoalPos(lvl.goal.x * w, lvl.goal.y * h);
+  this.cat.setCatPos(lvl.start.x * w, lvl.start.y * h);
+
+  // линия
+  this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: this.inkMax });
+  this.hud.setInkMax(this.inkMax);
+  this.line.setInkMax(this.inkMax);
+  this.line.setEnabled(true);
+
+  this.line.hookInput(
+    () => {
+      this.daily.inc("play_5", 1);
+      this.catStarted = true;
+      this.line.setEnabled(false);
+      this.cat.start();
+    },
+    () => tgHaptic("light")
+  );
+
+  // WIN
+  this.matter.world.on("collisionstart", (ev: any) => {
+    if (this.ended) return;
+
+    for (const pair of ev.pairs) {
+      const a = pair.bodyA;
+      const b = pair.bodyB;
+
+      if (
+        (a === this.cat.catBody && b === this.cat.goalBody) ||
+        (b === this.cat.catBody && a === this.cat.goalBody)
+      ) {
+        this.endWin();
+        return;
+      }
+    }
+  });
+}
 
   update() {
   if (this.paused || this.ended) return;
@@ -236,5 +249,40 @@ this.time.addEvent({
     lives: `${st.count}/${st.max}`,
     regenAt: st.nextRegenAt,
   });
+}
+private spawnPlatform(p: PlatformRect) {
+  const w = this.scale.width;
+  const h = this.scale.height;
+
+  const px = p.x * w;
+  const py = p.y * h;
+  const pw = p.w * w;
+  const ph = p.h;
+
+  // 1️⃣ Физика
+  const body = this.matter.add.rectangle(px, py, pw, ph, {
+    isStatic: true,
+    angle: p.angle ?? 0,
+  });
+
+  // 2️⃣ Визуал
+  if (p.visual) {
+    if (p.visual.mode === "tile") {
+      const tile = this.add.tileSprite(px, py, pw, ph, p.visual.key);
+      tile.setRotation(p.angle ?? 0);
+      tile.setDepth(p.visual.depth ?? 0);
+
+      const s = p.visual.tileScale ?? 1;
+      tile.tileScaleX = s;
+      tile.tileScaleY = s;
+    } else {
+      const img = this.add.image(px, py, p.visual.key);
+      img.setDisplaySize(pw, ph);
+      img.setRotation(p.angle ?? 0);
+      img.setDepth(p.visual.depth ?? 0);
+    }
+  }
+
+  return body;
 }
 }

@@ -112,6 +112,27 @@ export class LineDrawer {
 
       this.drawing = false;
 
+      // ✅ если это был просто тап — ничего не делаем
+  if (this.points.length < 2) {
+    this.clear();              // убрать “точку” если появилась
+    this.enabled = true;       // оставляем возможность рисовать
+    return;
+  }
+
+   // ✅ опционально: минимальная длина штриха
+  const minLen = 20;
+  let len = 0;
+  for (let i = 0; i < this.points.length - 1; i++) {
+    const a = this.points[i];
+    const b = this.points[i + 1];
+    len += Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
+  }
+  if (len < minLen) {
+    this.clear();
+    this.enabled = true;
+    return;
+  }
+
       // немного упрощаем линию → меньше сегментов → меньше тряски
       this.points = this.simplifyPointsAngle(this.points, 0.15);
 

@@ -6,11 +6,14 @@ export class CatRunner {
   public catBody: MatterJS.BodyType;
   public goalBody: MatterJS.BodyType;
 
-  public catGO: Phaser.GameObjects.Arc;
-  public goalGO: Phaser.GameObjects.Rectangle;
+  public catGO: Phaser.GameObjects.Sprite;
+  public goalGO: Phaser.GameObjects.Sprite;
 
   private running = false;
   private targetSpeedX = 2.2;
+
+  private visualOffsetY = 64; // подбери число
+  private goalOffsetY = 10;
 
   constructor(scene: Phaser.Scene, w: number, h: number) {
     this.scene = scene;
@@ -30,22 +33,59 @@ export class CatRunner {
       isSensor: true,
     });
 
-    this.catGO = scene.add.circle((this.catBody as any).position.x, (this.catBody as any).position.y, 18, 0xffffff);
-    this.goalGO = scene.add.rectangle((this.goalBody as any).position.x, (this.goalBody as any).position.y, 60, 60, 0xffffff);
+    //this.catGO = scene.add.circle((this.catBody as any).position.x, (this.catBody as any).position.y, 18, 0xffffff);
+    const cp = (this.catBody as any).position;
+
+// базовый кадр (первый кадр спрайтшита)
+this.catGO = scene.add.sprite(cp.x, cp.y, "cat_run", 0);
+// важное: чтобы визуал совпадал с физикой
+this.catGO.setOrigin(0.5, 0.5);
+// если размер кадра больше/меньше физического радиуса — подгони scale
+// например, если кадр 64x64, а тело 36px диаметром:
+this.catGO.setScale(36 / 64);
+// запускаем анимацию (если она создана заранее)
+this.catGO.anims.play("cat-run", true);
+    //this.goalGO = scene.add.rectangle((this.goalBody as any).position.x, (this.goalBody as any).position.y, 60, 60, 0xffffff);
+
+    const gp = (this.goalBody as any).position;
+
+    // визуал цели
+this.goalGO = scene.add.sprite(gp.x, gp.y, "goal_anim", 0);
+this.goalGO.setOrigin(0.5, 0.5);
+
+// если нужно масштабировать под 60x60 сенсор
+this.goalGO.setDisplaySize(200, 200);
+
+// запускаем анимацию
+this.goalGO.anims.play("goal-loop", true);
   }
 
   start() {
     this.running = true;
-    const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
-    matter.body.setVelocity(this.catBody, { x: this.targetSpeedX, y: 0 });
+    //const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
+    //matter.body.setVelocity(this.catBody, { x: this.targetSpeedX, y: 0 });
+     const Body = (Phaser.Physics.Matter as any).Matter.Body;
+  Body.setStatic(this.catBody, false);
+
+  Body.setVelocity(this.catBody, { x: this.targetSpeedX, y: 0 });
+  this.catGO.anims.play("cat-run", true);
+  this.goalGO.anims.play("cat-idle", true);
   }
 
   stop() {
-  const Body = (Phaser.Physics.Matter as any).Matter.Body;
+  //const Body = (Phaser.Physics.Matter as any).Matter.Body;
 
+  //Body.setVelocity(this.catBody, { x: 0, y: 0 });
+  //Body.setAngularVelocity(this.catBody, 0);
+  //Body.setStatic(this.catBody, true); // полностью замораживаем
+  this.running = false;
+
+  const Body = (Phaser.Physics.Matter as any).Matter.Body;
   Body.setVelocity(this.catBody, { x: 0, y: 0 });
   Body.setAngularVelocity(this.catBody, 0);
-  Body.setStatic(this.catBody, true); // полностью замораживаем
+  Body.setStatic(this.catBody, true);
+  this.catGO.anims.stop();
+  this.goalGO.anims.stop();
 }
 
   update() {
@@ -59,16 +99,35 @@ export class CatRunner {
     }
 
     const cp = (this.catBody as any).position;
-    this.catGO.setPosition(cp.x, cp.y);
-    this.catGO.setRotation((this.catBody as any).angle);
+    this.catGO.setPosition(cp.x, cp.y - this.visualOffsetY);
+    //this.catGO.setRotation((this.catBody as any).angle);
+    this.catGO.setRotation(0);
 
     const gp = (this.goalBody as any).position;
-    this.goalGO.setPosition(gp.x, gp.y);
+    this.goalGO.setPosition(gp.x, gp.y - this.goalOffsetY);
   }
 
   isFallenBelow(y: number) {
     const pos = (this.catBody as any).position;
     return pos && pos.y > y;
   }
+  setGoalPos(x: number, y: number) {
+  const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
+  matter.body.setPosition(this.goalBody, { x, y });
+}
+setCatPos(x: number, y: number) {
+  const Body = (Phaser.Physics.Matter as any).Matter.Body;
+
+  // если кот был "заморожен" — разморозим
+  Body.setStatic(this.catBody, false);
+
+  // ставим позицию и обнуляем физику
+  Body.setPosition(this.catBody, { x, y });
+  Body.setVelocity(this.catBody, { x: 0, y: 0 });
+  Body.setAngularVelocity(this.catBody, 0);
+
+  // чтобы визуал сразу обновился (не ждать update)
+  this.catGO.setPosition(x, y);
+}
   
 }
