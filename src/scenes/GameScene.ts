@@ -51,9 +51,9 @@ private winType: "reachGoal" | "survive" | "enterTrigger" = "reachGoal";
 private winTriggerId = "goal"; // для enterTrigger
 
 private loseNoWinAfterMs = 0;  // если >0 и win не случился -> проигрыш
-private loseStuckMs = 0;
-private loseMinSpeed = 0.05;
-private loseMinMovePx = 8;
+//private loseStuckMs = 0;
+//private loseMinSpeed = 0.05;
+//private loseMinMovePx = 8;
 private fellBelowY = 0;
 
 private loseNoWinDeadline = 0;
@@ -155,9 +155,9 @@ this.surviveMs = (win?.type === "survive") ? win.ms : 0;
 
 const lose = lvl.lose;
 this.loseNoWinAfterMs = lose?.noWinAfterMs ?? 0;
-this.loseStuckMs = lose?.stuckMs ?? 0;
-this.loseMinSpeed = lose?.minSpeed ?? 0.05;
-this.loseMinMovePx = lose?.minMovePx ?? 8;
+//this.loseStuckMs = lose?.stuckMs ?? 0;
+//this.loseMinSpeed = lose?.minSpeed ?? 0.05;
+//this.loseMinMovePx = lose?.minMovePx ?? 8;
 
 const fellBelow = lvl.lose?.fellBelowY;
 this.fellBelowY = fellBelow ?? (this.scale.height + 200);

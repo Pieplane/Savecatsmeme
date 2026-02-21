@@ -22,7 +22,7 @@ export const LEVELS: Record<number, LevelConfig> = {
 
     movement: { mode: "walk" },
     win: { type: "enterTrigger", triggerId: "goal" },
-    lose: { noWinAfterMs: 4000, stuckMs: 1500, minSpeed: 0.03, minMovePx: 6, fellBelowY: 1400 },
+    lose: { noWinAfterMs: 4000, fellBelowY: 1400 },
   },
 
   2: {

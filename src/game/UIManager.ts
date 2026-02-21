@@ -524,7 +524,7 @@ public createDebugBar(initialLevelId: number) {
   // если пересоздаём
   this.debugBar?.destroy(true);
 
-  const w = this.scene.scale.width;
+  //const w = this.scene.scale.width;
 
   const barY = 120;
   const btnW = 54;
