@@ -11,6 +11,7 @@ import { Lives } from "../game/Lives";
 import { getLevel } from "../game/levels/levels";
 import type { PlatformRect } from "../game/levels/LevelConfig";
 import { HazardSystem } from "../game/HazardSystem";
+import { SeesawLauncher } from "../game/SeesawLauncher";
 
 export class GameScene extends Phaser.Scene {
   private line!: LineDrawer;
@@ -37,6 +38,28 @@ export class GameScene extends Phaser.Scene {
   private matterWorld?: Phaser.Physics.Matter.World;
 
   private hazards!: HazardSystem;
+  private winTimer?: Phaser.Time.TimerEvent;
+private surviveMs = 0;
+
+private seesaw?: SeesawLauncher;
+
+private loseNoWinTimer?: Phaser.Time.TimerEvent;
+
+private stuckCheckTimer?: Phaser.Time.TimerEvent;
+
+private winType: "reachGoal" | "survive" | "enterTrigger" = "reachGoal";
+private winTriggerId = "goal"; // для enterTrigger
+
+private loseNoWinAfterMs = 0;  // если >0 и win не случился -> проигрыш
+private loseStuckMs = 0;
+private loseMinSpeed = 0.05;
+private loseMinMovePx = 8;
+private fellBelowY = 0;
+
+private loseNoWinDeadline = 0;
+private surviveDeadline = 0;
+
+private movementMode: "walk" | "launch" = "walk";
 
   private onCollide = (ev: any) => {
   if (this.ended) return;
@@ -57,18 +80,45 @@ export class GameScene extends Phaser.Scene {
       this.endLose();
       return;
     }
+    // качеля: если линия ударила сенсор — обработали и выходим
+if (this.seesaw?.handleCollision(a, b)) {
+  // можно сделать лёгкую вибрацию
+  tgHaptic("light");
+  continue;
+}
+
+
 
     // ✅ 2) WIN: кот + цель (после hazard)
-    const isCatGoal =
-      (a === this.cat.catBody && b === this.cat.goalBody) ||
-      (b === this.cat.catBody && a === this.cat.goalBody);
+    if (this.winType === "enterTrigger") {
+  const isTrigger = (body: MatterJS.BodyType) =>
+    !!body.isSensor && body.label === `trigger:${this.winTriggerId}`;
 
-    if (isCatGoal && !this.winQueued) {
-      this.winQueued = true;
-      this.line.setEnabled(false);
-      this.cat.beginWinSequence(this.winDelayMs, () => this.endWin());
-      return;
-    }
+  const isCatTrigger =
+    (a === this.cat.catBody && isTrigger(b)) ||
+    (b === this.cat.catBody && isTrigger(a));
+
+  if (isCatTrigger && !this.winQueued) {
+    this.winQueued = true;
+    this.line.setEnabled(false);
+    this.cat.beginWinSequence(this.winDelayMs, () => this.endWin());
+    return;
+  }
+}
+
+// WIN: reachGoal
+if (this.winType === "reachGoal") {
+  const isCatGoal =
+    (a === this.cat.catBody && b === this.cat.goalTriggerBody) ||
+    (b === this.cat.catBody && a === this.cat.goalTriggerBody);
+
+  if (isCatGoal && !this.winQueued) {
+    this.winQueued = true;
+    this.line.setEnabled(false);
+    this.cat.beginWinSequence(this.winDelayMs, () => this.endWin());
+    return;
+  }
+}
   }
 };
 
@@ -96,6 +146,25 @@ export class GameScene extends Phaser.Scene {
   const h = this.scale.height;
 
   const lvl = getLevel(this.levelId);
+  this.movementMode = lvl.movement?.mode ?? "walk";
+
+const win = lvl.win;
+this.winType = win?.type ?? "reachGoal";
+this.winTriggerId = (win?.type === "enterTrigger") ? win.triggerId : "goal";
+this.surviveMs = (win?.type === "survive") ? win.ms : 0;
+
+const lose = lvl.lose;
+this.loseNoWinAfterMs = lose?.noWinAfterMs ?? 0;
+this.loseStuckMs = lose?.stuckMs ?? 0;
+this.loseMinSpeed = lose?.minSpeed ?? 0.05;
+this.loseMinMovePx = lose?.minMovePx ?? 8;
+
+const fellBelow = lvl.lose?.fellBelowY;
+this.fellBelowY = fellBelow ?? (this.scale.height + 200);
+
+// почистим таймер на всякий
+this.winTimer?.remove(false);
+this.winTimer = undefined;
 
   this.hazards = new HazardSystem(this, {
   enabled: !!lvl.hazard,                 // или lvl.hazard?.enabled
@@ -167,6 +236,23 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   this.cat = new CatRunner(this, w, h);  
   this.cat.setGoalPos(lvl.goal.x * w, lvl.goal.y * h);
   this.cat.setCatPos(lvl.start.x * w, lvl.start.y * h);
+  this.cat.setGoalTriggerId(this.winType === "enterTrigger" ? this.winTriggerId : "goal");
+
+const sw = lvl.seesaw;
+
+if (sw?.enabled) {
+  this.seesaw = new SeesawLauncher(this, this.cat.catBody, this.cat.goalBody, {
+    width: sw.width ?? 240,
+    height: sw.height ?? 18,
+    upVelocity: sw.upVelocity ?? 18,
+    flightTime: sw.flightTime ?? 0.95,
+    cooldownMs: sw.cooldownMs ?? 700,
+  });
+
+  this.seesaw.setPosition(this.scale.width * sw.x, this.scale.height * sw.y);
+} else {
+  this.seesaw = undefined;
+}
 
   // линия
   this.line = new LineDrawer(this, { thickness: 10, minPointDist: 12, inkMax: this.inkMax });
@@ -179,8 +265,39 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
       this.daily.inc("play_5", 1);
       this.catStarted = true;
       this.line.setEnabled(false);
+      //this.cat.start();
+      if (this.movementMode === "walk") {
       this.cat.start();
+      } else {
+      this.cat.stop();
+}
       this.hazards.start();
+
+      if (this.loseNoWinAfterMs > 0) {
+  this.loseNoWinDeadline = Date.now() + this.loseNoWinAfterMs;
+
+  this.loseNoWinTimer?.remove(false);
+  this.loseNoWinTimer = this.time.delayedCall(this.loseNoWinAfterMs, () => {
+    if (this.ended || this.winQueued) return;
+    this.endLose();
+  });
+} else {
+  this.loseNoWinDeadline = 0;
+}
+      // ✅ если уровень "survive" — ставим таймер победы
+if (this.winType === "survive" && this.surviveMs > 0) {
+  this.surviveDeadline = Date.now() + this.surviveMs;
+
+  this.winTimer?.remove(false);
+  this.winTimer = this.time.delayedCall(this.surviveMs, () => {
+    if (this.ended || this.winQueued) return;
+    this.winQueued = true;
+    this.line.setEnabled(false);
+    this.cat.beginWinSequence(0, () => this.endWin());
+  });
+} else {
+  this.surviveDeadline = 0;
+}
     },
     () => tgHaptic("light")
   );
@@ -190,11 +307,22 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
 
   const cleanup = () => {
     this.hazards?.destroy();
+    this.winTimer?.remove(false);
+this.winTimer = undefined;
 
     if (this.matterWorld) {
       this.matterWorld.off("collisionstart", this.onCollide);
       this.matterWorld = undefined;
     }
+
+    this.loseNoWinTimer?.remove(false);
+this.loseNoWinTimer = undefined;
+
+this.stuckCheckTimer?.remove(false);
+this.stuckCheckTimer = undefined;
+
+this.loseNoWinDeadline = 0;
+this.surviveDeadline = 0;
   };
 
   if (this.matterWorld) {
@@ -214,11 +342,13 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   this.line.update();
   this.ui.setInk(this.line.inkLeft);
   this.hazards.update();
+  this.seesaw?.update();
 
   // ✅ проигрыш проверяем только после старта
-  if (this.catStarted && this.cat.isFallenBelow(this.scale.height + 200)) {
+  if (this.catStarted && this.cat.isFallenBelow(this.fellBelowY)) {
     this.endLose();
   }
+  if (this.ui) this.updateDebugTimersUI();
 }
 
   private endWin() {
@@ -272,6 +402,15 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   this.ui.setWinInfo({ stars, reward });
   this.ui.showWin(() => this.scene.restart());
   tgHaptic("success");
+
+  this.loseNoWinTimer?.remove(false);
+this.loseNoWinTimer = undefined;
+
+this.stuckCheckTimer?.remove(false);
+this.stuckCheckTimer = undefined;
+
+this.loseNoWinDeadline = 0;
+this.surviveDeadline = 0;
 }
 
   private endLose() {
@@ -279,6 +418,8 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
     this.ended = true;
 
     this.line.setEnabled(false);
+    this.winTimer?.remove(false);
+this.winTimer = undefined;
 
     // сброс серий в progress
     const p = loadProgress();
@@ -298,6 +439,14 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   }
 
   tgHaptic("error");
+  this.loseNoWinTimer?.remove(false);
+this.loseNoWinTimer = undefined;
+
+this.stuckCheckTimer?.remove(false);
+this.stuckCheckTimer = undefined;
+
+this.loseNoWinDeadline = 0;
+this.surviveDeadline = 0;
   }
 
   private pauseGame() {
@@ -358,5 +507,30 @@ private spawnPlatform(p: PlatformRect) {
   }
 
   return body;
+}
+private updateDebugTimersUI() {
+  // показываем только если debug включен (если хочешь — сделай флаг)
+  const now = Date.now();
+
+  const lines: string[] = [];
+
+  if (this.loseNoWinDeadline > 0) {
+    const left = Math.max(0, this.loseNoWinDeadline - now);
+    lines.push(`LOSE in: ${(left / 1000).toFixed(2)}s`);
+  } else {
+    lines.push(`LOSE in: -`);
+  }
+
+  if (this.surviveDeadline > 0) {
+    const left = Math.max(0, this.surviveDeadline - now);
+    lines.push(`SURVIVE left: ${(left / 1000).toFixed(2)}s`);
+  } else {
+    lines.push(`SURVIVE left: -`);
+  }
+
+  lines.push(`winType: ${this.winType}`);
+  lines.push(`catStarted: ${this.catStarted ? "yes" : "no"}`);
+
+  this.ui.setDebugTimers(lines);
 }
 }

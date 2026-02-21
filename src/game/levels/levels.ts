@@ -3,24 +3,26 @@ import type { LevelConfig } from "./LevelConfig";
 export const LEVELS: Record<number, LevelConfig> = {
   1: {
     id: 1,
-    inkMax: 260,
+    inkMax: 860,
     visuals: {
       backgroundKey: "bg_game",
       hintText: "Нарисуй мост. Отпусти палец — кот пойдет.",
     },
     platforms: [
-      { x: 0.50, y: 0.70, w: 1.00, h: 128, visual: { key: "grass_mid", mode: "tile" } },  // земля
+      { x: 0.150, y: 0.70, w: 0.300, h: 128, visual: { key: "grass_mid", mode: "tile" } },  // земля
+      { x: 0.150, y: 0.80, w: 0.300, h: 128, visual: { key: "dirt_down", mode: "tile" } },  // земля
+
+      { x: 0.850, y: 0.70, w: 0.300, h: 128, visual: { key: "grass_mid", mode: "tile" } },  // земля
+      { x: 0.850, y: 0.80, w: 0.300, h: 128, visual: { key: "dirt_down", mode: "tile" } },  // земля
     ],
-    goal: { x: 0.78, y: 0.60 },
-    start: { x: 0.15, y: 0.60 },
-    hazard: {
-    delayMs: 2000,
-    spawnX: 0.5,
-    spawnY: -50,
-    repeat: true,
-    everyMs: 1500,
-    radius: 18,
-  },
+
+    start: { x: 0.15, y: 0.65 },
+    goal: { x: 0.85, y: 0.60 },
+    
+
+    movement: { mode: "walk" },
+    win: { type: "enterTrigger", triggerId: "goal" },
+    lose: { noWinAfterMs: 4000, stuckMs: 1500, minSpeed: 0.03, minMovePx: 6, fellBelowY: 1400 },
   },
 
   2: {
@@ -28,12 +30,31 @@ export const LEVELS: Record<number, LevelConfig> = {
     inkMax: 240,
     visuals: { backgroundKey: "bg_game" },
     platforms: [
-      { x: 0.50, y: 0.92, w: 1.00, h: 80, visual: { key: "grass_mid", mode: "tile" } },
-      { x: 0.30, y: 0.78, w: 0.30, h: 20, visual: { key: "grass_mid", mode: "tile" } },
-      { x: 0.72, y: 0.68, w: 0.28, h: 20, visual:{ key: "grass_mid", mode: "tile" } },
+      { x: 0.5, y: 0.70, w: 1, h: 128, visual: { key: "grass_mid", mode: "tile" } },  // земля
+      { x: 0.5, y: 0.80, w: 1, h: 128, visual: { key: "dirt_down", mode: "tile" } },  // земля
     ],
-    goal: { x: 0.72, y: 0.62 },
-    start: { x: 0.15, y: 0.80 },
+
+    start: { x: 0.15, y: 0.65 },
+    goal: { x: 0.85, y: 0.60 },
+    
+    //hazard: {
+    //delayMs: 2000,
+    //spawnX: 0.5,
+    //spawnY: -50,
+    //repeat: false,
+    //everyMs: 1500,
+    //radius: 48,
+  //},
+  //seesaw: {
+  //enabled: true,
+  //x: 0.45,
+  //y: 0.62,
+  //width: 240,
+  //height: 18,
+  //upVelocity: 18,
+  //flightTime: 0.95,
+  //cooldownMs: 700,
+//},
   },
 };
 

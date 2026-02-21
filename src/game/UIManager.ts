@@ -44,6 +44,8 @@ private debugBar?: Phaser.GameObjects.Container;
 private debugLevelText?: Phaser.GameObjects.Text;
 private debugEnabled = true; // выключишь на релизе
 
+private debugTimerText?: Phaser.GameObjects.Text;
+
   private tasks: Task[] = [
     { id: "t1", title: "Выиграй 1 раз", progress: 0, goal: 1 },
     { id: "t2", title: "Потрать ≤ 200 ink", progress: 0, goal: 200 },
@@ -572,5 +574,29 @@ public createDebugBar(initialLevelId: number) {
   this.scene.scale.on("resize", () => {
     // если хочешь — можно сдвигать вправо, но сейчас слева, ок
   });
+}
+public setDebugTimersVisible(v: boolean) {
+  if (!this.debugEnabled) return;
+  this.debugTimerText?.setVisible(v);
+}
+
+public setDebugTimers(lines: string[]) {
+  if (!this.debugEnabled) return;
+
+  if (!this.debugTimerText) {
+    this.debugTimerText = this.scene.add.text(16, 260, "", {
+      fontSize: "14px",
+      color: "#000",
+      fontFamily: "Arial",
+      backgroundColor: "#ffffff",
+      padding: { left: 8, right: 8, top: 6, bottom: 6 } as any,
+    })
+    .setDepth(2000)
+    .setScrollFactor(0);
+
+    this.root.add(this.debugTimerText);
+  }
+
+  this.debugTimerText.setText(lines.join("\n"));
 }
 }

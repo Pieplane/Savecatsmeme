@@ -8,7 +8,7 @@ export class BootScene extends Phaser.Scene {
   preload() {
     // Глобальные ассеты игры
     this.load.image("grass_mid", "assets/platforms/GrassMid.png");
-    this.load.image("plat_stone", "assets/platforms/stone.png");
+    this.load.image("dirt_down", "assets/platforms/DirtDown.png");
     this.load.image("plat_ice", "assets/platforms/ice.png");
 
     this.load.spritesheet("cat_run", "assets/cat/cat_run.png", {
@@ -36,7 +36,7 @@ this.load.spritesheet("goal_win", "assets/goal/goal_win.png", {
     });
     this.anims.create({
       key: "goal-loop",
-      frames: this.anims.generateFrameNumbers("goal_anim", { start: 0, end: 7 }),
+      frames: this.anims.generateFrameNumbers("goal_anim", { start: 0, end: 49 }),
       frameRate: 12,
       repeat: -1,
     });

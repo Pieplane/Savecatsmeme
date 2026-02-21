@@ -5,6 +5,7 @@ export class CatRunner {
 
   public catBody: MatterJS.BodyType;
   public goalBody: MatterJS.BodyType;
+  public goalTriggerBody: MatterJS.BodyType;
 
   public catGO: Phaser.GameObjects.Sprite;
   public goalGO: Phaser.GameObjects.Sprite;
@@ -39,10 +40,22 @@ private currentGoalOffsetY = 10;
     // не спать
     matter.body.set(this.catBody, { sleepThreshold: -1 });
 
-    this.goalBody = matter.add.rectangle(w * 0.88, h - 180, 150, 100, {
+    const gpX = w * 0.88;
+    const gpY = h - 180;
+
+    this.goalBody = matter.add.rectangle(gpX, gpY, 150, 100, {
       isStatic: true,
-      isSensor: true,
+      isSensor: false,
+      label: "goalSolid",
+      restitution: 0,
+      friction: 0.9,
     });
+    // 2) SENSOR триггер победы (чуть больше)
+this.goalTriggerBody = matter.add.rectangle(gpX, gpY, 180, 130, {
+  isStatic: true,
+  isSensor: true,
+  label: "trigger:goal",
+});
 
     //this.catGO = scene.add.circle((this.catBody as any).position.x, (this.catBody as any).position.y, 18, 0xffffff);
     const cp = (this.catBody as any).position;
@@ -100,7 +113,7 @@ this.syncGoalVisualNow();
   Body.setAngularVelocity(this.catBody, 0);
   Body.setStatic(this.catBody, true);
   //this.catGO.anims.stop();
-  this.goalGO.anims.stop();
+  //this.goalGO.anims.stop();
 }
 
   update() {
@@ -133,6 +146,7 @@ this.syncGoalVisualNow();
   setGoalPos(x: number, y: number) {
   const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
   matter.body.setPosition(this.goalBody, { x, y });
+  matter.body.setPosition(this.goalTriggerBody, { x, y });
 }
 setCatPos(x: number, y: number) {
   const Body = (Phaser.Physics.Matter as any).Matter.Body;
@@ -172,6 +186,9 @@ private syncGoalVisualNow() {
     gp.x + this.currentGoalOffsetX,
     gp.y - this.currentGoalOffsetY
   );
+}
+setGoalTriggerId(id: string) {
+  (this.goalTriggerBody as any).label = `trigger:${id}`;
 }
   
 }

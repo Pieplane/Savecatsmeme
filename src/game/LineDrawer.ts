@@ -235,6 +235,9 @@ export class LineDrawer {
       frictionAir: 0.06,
     });
 
+    // ✅ ВАЖНО: label для распознавания линий (качеля/опасности и т.п.)
+    (compound as any).label = "line";
+
     // ✅ добавили в мир одно тело
     matter.world.add(compound);
     this.rigidBody = compound;

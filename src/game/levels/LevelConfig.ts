@@ -35,4 +35,32 @@ export type LevelConfig = {
   everyMs?: number;
   radius?: number;
 };
+seesaw?: {
+  enabled: boolean;
+  x: number; // 0..1
+  y: number; // 0..1
+  width?: number;
+  height?: number;
+  upVelocity?: number;
+  flightTime?: number;
+  cooldownMs?: number;
+};
+win?: 
+  | { type: "reachGoal" }
+  | { type: "survive"; ms: number }
+  | { type: "enterTrigger"; triggerId: string };
+
+lose?: {
+  // общий таймер: если win не случился — проигрыш
+  noWinAfterMs?: number;
+
+  // “застрял”: если почти не движется/не прогрессит
+  stuckMs?: number;
+  minSpeed?: number;     // например 0.05
+  minMovePx?: number;    // например 8 (за окно времени)
+
+  // упал вниз
+  fellBelowY?: number;
+};
+movement?: { mode: "walk" | "launch" };
 };
