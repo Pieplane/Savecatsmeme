@@ -45,15 +45,11 @@ private seesaw?: SeesawLauncher;
 
 private loseNoWinTimer?: Phaser.Time.TimerEvent;
 
-private stuckCheckTimer?: Phaser.Time.TimerEvent;
 
 private winType: "reachGoal" | "survive" | "enterTrigger" = "reachGoal";
 private winTriggerId = "goal"; // для enterTrigger
 
 private loseNoWinAfterMs = 0;  // если >0 и win не случился -> проигрыш
-//private loseStuckMs = 0;
-//private loseMinSpeed = 0.05;
-//private loseMinMovePx = 8;
 private fellBelowY = 0;
 
 private loseNoWinDeadline = 0;
@@ -318,8 +314,6 @@ this.winTimer = undefined;
     this.loseNoWinTimer?.remove(false);
 this.loseNoWinTimer = undefined;
 
-this.stuckCheckTimer?.remove(false);
-this.stuckCheckTimer = undefined;
 
 this.loseNoWinDeadline = 0;
 this.surviveDeadline = 0;
@@ -406,8 +400,6 @@ this.surviveDeadline = 0;
   this.loseNoWinTimer?.remove(false);
 this.loseNoWinTimer = undefined;
 
-this.stuckCheckTimer?.remove(false);
-this.stuckCheckTimer = undefined;
 
 this.loseNoWinDeadline = 0;
 this.surviveDeadline = 0;
@@ -442,8 +434,6 @@ this.winTimer = undefined;
   this.loseNoWinTimer?.remove(false);
 this.loseNoWinTimer = undefined;
 
-this.stuckCheckTimer?.remove(false);
-this.stuckCheckTimer = undefined;
 
 this.loseNoWinDeadline = 0;
 this.surviveDeadline = 0;
