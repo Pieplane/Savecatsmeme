@@ -243,6 +243,12 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   this.cat.setCatPos(lvl.start.x * w, lvl.start.y * h);
   this.cat.setGoalTriggerId(this.winType === "enterTrigger" ? this.winTriggerId : "goal");
   this.cat.setPreDrawGlide(true);
+  // подключаем эффект
+this.cat.setOnGlideFx(() => {
+  tgHaptic("light");
+  // если хочешь звук:
+  // this.sound.play("glide", { volume: 0.2 });
+});
 
 const sw = lvl.seesaw;
 

@@ -26,7 +26,11 @@ private goalWinOffsetY = 0;
 private currentGoalOffsetX = -25;
 private currentGoalOffsetY = 10;
   private finishing = false;
-  private preDrawGlide = true;
+  private onGlideFx?: () => void;
+private preDrawGlide = true;
+private glideFxNextAt = 0;
+
+  
 
 
   constructor(scene: Phaser.Scene, w: number, h: number) {
@@ -136,6 +140,15 @@ this.syncGoalVisualNow();
     if (v.y > maxFall) {
       Body.setVelocity(this.catBody, { x: 0, y: maxFall });
     }
+
+    // эффект только если реально падает
+  const now = Date.now();
+  const falling = v.y > 0.15;
+
+  if (falling && now >= this.glideFxNextAt) {
+    this.onGlideFx?.();      // 🔔 сцена решает что делать
+    this.glideFxNextAt = now + 350; // раз в 350мс
+  }
   }
 
     if (this.running) {
@@ -209,8 +222,14 @@ private syncGoalVisualNow() {
 setGoalTriggerId(id: string) {
   (this.goalTriggerBody as any).label = `trigger:${id}`;
 }
+setOnGlideFx(cb?: () => void) {
+  this.onGlideFx = cb;
+}
+
 setPreDrawGlide(enabled: boolean) {
   this.preDrawGlide = enabled;
+  this.glideFxNextAt = 0;
 }
+
   
 }
