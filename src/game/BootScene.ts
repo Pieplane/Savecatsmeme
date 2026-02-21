@@ -9,7 +9,7 @@ export class BootScene extends Phaser.Scene {
     // Глобальные ассеты игры
     this.load.image("grass_mid", "assets/platforms/GrassMid.png");
     this.load.image("dirt_down", "assets/platforms/DirtDown.png");
-    this.load.image("plat_ice", "assets/platforms/ice.png");
+    this.load.image("dirt", "assets/platforms/Dirt.png");
 
     this.load.spritesheet("cat_run", "assets/cat/cat_run.png", {
   frameWidth: 498,

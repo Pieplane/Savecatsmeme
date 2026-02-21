@@ -55,6 +55,16 @@ private fellBelowY = 0;
 private loseNoWinDeadline = 0;
 private surviveDeadline = 0;
 
+private loseStuckMs = 0;
+private loseMinMovePx = 8;
+
+private stuckCheckTimer?: Phaser.Time.TimerEvent;
+private stuckAccumMs = 0;
+
+private stuckWindowMs = 800; // окно проверки
+private stuckWindowStartAt = 0;
+private stuckWindowStartPos?: { x: number; y: number };
+
 private movementMode: "walk" | "launch" = "walk";
 
   private onCollide = (ev: any) => {
@@ -151,9 +161,8 @@ this.surviveMs = (win?.type === "survive") ? win.ms : 0;
 
 const lose = lvl.lose;
 this.loseNoWinAfterMs = lose?.noWinAfterMs ?? 0;
-//this.loseStuckMs = lose?.stuckMs ?? 0;
-//this.loseMinSpeed = lose?.minSpeed ?? 0.05;
-//this.loseMinMovePx = lose?.minMovePx ?? 8;
+this.loseStuckMs = lose?.stuckMs ?? 0;
+this.loseMinMovePx = lose?.minMovePx ?? 8;
 
 const fellBelow = lvl.lose?.fellBelowY;
 this.fellBelowY = fellBelow ?? (this.scale.height + 200);
@@ -233,6 +242,7 @@ this.ui.createDebugBar(this.levelId); // ✅ ВОТ ЭТО ОБЯЗАТЕЛЬН�
   this.cat.setGoalPos(lvl.goal.x * w, lvl.goal.y * h);
   this.cat.setCatPos(lvl.start.x * w, lvl.start.y * h);
   this.cat.setGoalTriggerId(this.winType === "enterTrigger" ? this.winTriggerId : "goal");
+  this.cat.setPreDrawGlide(true);
 
 const sw = lvl.seesaw;
 
@@ -259,7 +269,9 @@ if (sw?.enabled) {
   this.line.hookInput(
     () => {
       this.daily.inc("play_5", 1);
+      this.cat.setPreDrawGlide(false); // ✅ отключили навсегда для уровня
       this.catStarted = true;
+      this.startStuckDetection();
       this.line.setEnabled(false);
       //this.cat.start();
       if (this.movementMode === "walk") {
@@ -269,7 +281,7 @@ if (sw?.enabled) {
 }
       this.hazards.start();
 
-      if (this.loseNoWinAfterMs > 0) {
+      if (this.loseNoWinAfterMs > 0&& this.loseStuckMs <= 0) {
   this.loseNoWinDeadline = Date.now() + this.loseNoWinAfterMs;
 
   this.loseNoWinTimer?.remove(false);
@@ -305,6 +317,7 @@ if (this.winType === "survive" && this.surviveMs > 0) {
     this.hazards?.destroy();
     this.winTimer?.remove(false);
 this.winTimer = undefined;
+this.stopStuckDetection();
 
     if (this.matterWorld) {
       this.matterWorld.off("collisionstart", this.onCollide);
@@ -351,6 +364,7 @@ this.surviveDeadline = 0;
 
   if (this.ended) return; // на всякий
   this.ended = true;
+  this.stopStuckDetection();
 
   const used = this.inkMax - this.line.inkLeft;
   const dt = Date.now() - this.runStartedAt;
@@ -412,6 +426,7 @@ this.surviveDeadline = 0;
     this.line.setEnabled(false);
     this.winTimer?.remove(false);
 this.winTimer = undefined;
+this.stopStuckDetection();
 
     // сброс серий в progress
     const p = loadProgress();
@@ -522,5 +537,65 @@ private updateDebugTimersUI() {
   lines.push(`catStarted: ${this.catStarted ? "yes" : "no"}`);
 
   this.ui.setDebugTimers(lines);
+}
+private startStuckDetection() {
+  if (this.loseStuckMs <= 0) return;
+
+  this.stopStuckDetection();
+
+  this.stuckAccumMs = 0;
+  this.stuckWindowMs = 800; // можно вынести в конфиг, но пока ок
+
+  const p = (this.cat.catBody as any).position;
+  this.stuckWindowStartAt = Date.now();
+  this.stuckWindowStartPos = p ? { x: p.x, y: p.y } : undefined;
+
+  const tickMs = 200;
+
+  this.stuckCheckTimer = this.time.addEvent({
+    delay: tickMs,
+    loop: true,
+    callback: () => {
+      if (this.ended || !this.catStarted) return;
+
+      const body: any = this.cat.catBody;
+      const pos = body.position;
+      if (!pos || !this.stuckWindowStartPos) return;
+
+      const now = Date.now();
+      const dt = now - this.stuckWindowStartAt;
+
+      // ждём пока окно накопится
+      if (dt < this.stuckWindowMs) return;
+
+      const dx = pos.x - this.stuckWindowStartPos.x;
+      const dy = pos.y - this.stuckWindowStartPos.y;
+      const moved = Math.sqrt(dx * dx + dy * dy);
+
+      const stuckThisWindow = moved < this.loseMinMovePx;
+
+      if (stuckThisWindow) {
+        this.stuckAccumMs += this.stuckWindowMs;
+        if (this.stuckAccumMs >= this.loseStuckMs) {
+          this.endLose();
+          return;
+        }
+      } else {
+        this.stuckAccumMs = 0;
+      }
+
+      // начинаем новое окно с текущей позиции
+      this.stuckWindowStartAt = now;
+      this.stuckWindowStartPos = { x: pos.x, y: pos.y };
+    },
+  });
+}
+
+private stopStuckDetection() {
+  this.stuckCheckTimer?.remove(false);
+  this.stuckCheckTimer = undefined;
+  this.stuckAccumMs = 0;
+  this.stuckWindowStartAt = 0;
+  this.stuckWindowStartPos = undefined;
 }
 }

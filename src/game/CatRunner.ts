@@ -26,6 +26,8 @@ private goalWinOffsetY = 0;
 private currentGoalOffsetX = -25;
 private currentGoalOffsetY = 10;
   private finishing = false;
+  private preDrawGlide = true;
+
 
   constructor(scene: Phaser.Scene, w: number, h: number) {
     this.scene = scene;
@@ -36,6 +38,10 @@ private currentGoalOffsetY = 10;
       frictionAir: 0.01,
       restitution: 0,
     });
+    const Body = (Phaser.Physics.Matter as any).Matter.Body;
+
+// не статик!
+Body.setStatic(this.catBody, false);
 
     // не спать
     matter.body.set(this.catBody, { sleepThreshold: -1 });
@@ -51,7 +57,7 @@ private currentGoalOffsetY = 10;
       friction: 0.9,
     });
     // 2) SENSOR триггер победы (чуть больше)
-this.goalTriggerBody = matter.add.rectangle(gpX, gpY, 180, 130, {
+this.goalTriggerBody = matter.add.rectangle(gpX, gpY, 200, 130, {
   isStatic: true,
   isSensor: true,
   label: "trigger:goal",
@@ -89,6 +95,8 @@ this.syncGoalVisualNow();
   }
 
   start() {
+    if (this.running || this.finishing) return;
+
     this.running = true;
     //const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
     //matter.body.setVelocity(this.catBody, { x: this.targetSpeedX, y: 0 });
@@ -118,6 +126,17 @@ this.syncGoalVisualNow();
 
   update() {
     const matter = (this.scene as any).matter as Phaser.Physics.Matter.MatterPhysics;
+    const Body = (Phaser.Physics.Matter as any).Matter.Body;
+
+     // ✅ ПЛАНИРОВАНИЕ до старта: ограничиваем скорость падения
+  if (this.preDrawGlide && !this.finishing) {
+    const v = (this.catBody as any).velocity;
+    const maxFall = 0.6; // подбирай: 0.2 очень медленно, 0.6 норм, 1.2 быстрее
+
+    if (v.y > maxFall) {
+      Body.setVelocity(this.catBody, { x: 0, y: maxFall });
+    }
+  }
 
     if (this.running) {
       const v = (this.catBody as any).velocity;
@@ -151,13 +170,13 @@ this.syncGoalVisualNow();
 setCatPos(x: number, y: number) {
   const Body = (Phaser.Physics.Matter as any).Matter.Body;
 
-  // если кот был "заморожен" — разморозим
-  Body.setStatic(this.catBody, false);
-
   // ставим позицию и обнуляем физику
   Body.setPosition(this.catBody, { x, y });
   Body.setVelocity(this.catBody, { x: 0, y: 0 });
   Body.setAngularVelocity(this.catBody, 0);
+
+  // если кот был "заморожен" — разморозим
+  Body.setStatic(this.catBody, false);
 
   // чтобы визуал сразу обновился (не ждать update)
   this.catGO.setPosition(x, y);
@@ -189,6 +208,9 @@ private syncGoalVisualNow() {
 }
 setGoalTriggerId(id: string) {
   (this.goalTriggerBody as any).label = `trigger:${id}`;
+}
+setPreDrawGlide(enabled: boolean) {
+  this.preDrawGlide = enabled;
 }
   
 }

@@ -28,7 +28,7 @@ new Phaser.Game({
     default: "matter",
     matter: {
       gravity: { x: 0, y: 1.2 },
-      debug: true,
+      debug: false,
     },
   },
   scene: [BootScene, MenuScene, GameScene], // ← сначала меню
